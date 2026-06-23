@@ -65,6 +65,16 @@ def choose_action(q_net, obs, cfg: Config, eps: float, device: torch.device, nor
     return int(np.argmax(np.where(mask, q, -np.inf)))
 
 
+def episode_cost(stats: dict) -> float:
+    cost = stats["energy"] + stats["late_cost"] + stats["drop_cost"] + stats["depletion_cost"]
+    return cost / max(stats["delivered"], 1)
+
+
+def checkpoint_path(weight_path: str, step: int) -> Path:
+    path = Path(weight_path)
+    return path.with_name(f"{path.stem}_step_{step}{path.suffix}")
+
+
 def train(config_path: str):
     with open(config_path, "r", encoding="utf-8") as f:
         train_cfg = yaml.safe_load(f)
@@ -89,6 +99,8 @@ def train(config_path: str):
     if reward_scale <= 0:
         raise ValueError("reward_scale must be positive")
     normalize_time = bool(train_cfg.get("normalize_time", False))
+    checkpoint_interval = int(train_cfg.get("checkpoint_interval", 0))
+    print_every_episodes = max(int(train_cfg.get("print_every_episodes", 1)), 1)
 
     Path(train_cfg["log_path"]).parent.mkdir(parents=True, exist_ok=True)
     Path(train_cfg["weight_path"]).parent.mkdir(parents=True, exist_ok=True)
@@ -160,14 +172,26 @@ def train(config_path: str):
             if global_step % int(train_cfg["target_update_every"]) == 0:
                 target_net.load_state_dict(q_net.state_dict())
 
+            if checkpoint_interval > 0 and global_step % checkpoint_interval == 0:
+                save_checkpoint(
+                    checkpoint_path(train_cfg["weight_path"], global_step),
+                    env_cfg,
+                    q_net,
+                    train_cfg,
+                )
+
             if done or global_step >= total_steps:
                 break
 
+        cost_per_order = episode_cost(env.stats)
         rows.append(
             {
                 "episode": episode,
                 "step": global_step,
                 "episode_return": ep_return,
+                "cost_per_order": cost_per_order,
+                "delivered": env.stats["delivered"],
+                "dropped": env.stats["dropped"],
                 "epsilon": epsilon_by_step(global_step, train_cfg),
                 "loss": last_loss,
                 "assign_actions": action_counts["assign"],
@@ -177,11 +201,13 @@ def train(config_path: str):
                 "train_updates": train_updates,
             }
         )
-        print(
-            f"episode={episode} step={global_step} return={ep_return:.2f} "
-            f"epsilon={rows[-1]['epsilon']:.3f} loss={last_loss} "
-            f"charge={action_counts['charge']}/{charge_open_steps} updates={train_updates}"
-        )
+        if episode % print_every_episodes == 0 or global_step >= total_steps:
+            print(
+                f"episode={episode} step={global_step} return={ep_return:.2f} "
+                f"cost={cost_per_order:.2f} epsilon={rows[-1]['epsilon']:.3f} "
+                f"loss={last_loss} charge={action_counts['charge']}/{charge_open_steps} "
+                f"updates={train_updates}"
+            )
         episode += 1
 
     with open(train_cfg["log_path"], "w", newline="", encoding="utf-8") as f:
@@ -191,6 +217,9 @@ def train(config_path: str):
                 "episode",
                 "step",
                 "episode_return",
+                "cost_per_order",
+                "delivered",
+                "dropped",
                 "epsilon",
                 "loss",
                 "assign_actions",

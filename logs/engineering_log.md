@@ -58,3 +58,14 @@ With `time / T_max`, the same learning rate, reward scale, seed, and 60,000-step
 - Episode return improved to -364.50.
 
 Time normalization fixed part of the shared problem, but the policy still did not beat random. The last 100 training episodes still averaged -570.61 and contained 12,899 no-op actions. The next test should target temporal credit assignment instead of another value-head architecture.
+
+## Long-run benchmark
+
+Before starting a long run, training now logs `episode_return` and the official `cost_per_order` formula side by side. The 20,000-step benchmark produced a Pearson correlation of -0.961 between them. Higher return therefore strongly corresponds to lower cost in the observed episodes, so the optimization target is not visibly misaligned with the grading metric.
+
+The benchmark took 46.973 seconds, or about 425.8 environment steps per second. Estimated training times on the same machine:
+- 600,000 steps: 23.5 minutes
+- 3,000,000 steps: 117.4 minutes
+- 6,000,000 steps: 234.9 minutes
+
+Checkpoint evaluation over seeds 0, 1, and 2 improved from `cost_per_order = 60.83` at 10,000 steps to 37.03 at 20,000 steps. Both are still immature policies. A 6,000,000-step run was selected with checkpoints every 500,000 steps. The measured runtime estimate is about 3 hours 55 minutes.
