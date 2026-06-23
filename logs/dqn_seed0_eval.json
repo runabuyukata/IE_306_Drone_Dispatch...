@@ -2,16 +2,22 @@
   "weights": "weights/dqn_seed0.pt",
   "seeds": [0, 1, 2],
   "results": {
-    "cost_per_order": 17.62374967624967,
-    "success_rate": 0.9283643892339546,
-    "ontime_rate": 0.9876543209876543,
-    "mean_delivery_time": 28.101139601139604,
-    "energy_per_order": 0.32305037555037064,
-    "depletion_events": 8.0,
-    "idle_pct": 0.13400688839977173,
-    "charger_utilization": 0.0,
-    "n_delivered": 25.0,
-    "n_dropped": 2.0,
-    "episode_return": -64.84700000000005
+    "cost_per_order": 29.38606936856247,
+    "success_rate": 0.38507980928689883,
+    "ontime_rate": 0.8467383191521122,
+    "mean_delivery_time": 39.83831417624521,
+    "energy_per_order": 0.32508315171418395,
+    "depletion_events": 3.6666666666666665,
+    "idle_pct": 0.1542777001030706,
+    "charger_utilization": 0.19275126499770143,
+    "n_delivered": 51.666666666666664,
+    "n_dropped": 83.66666666666667,
+    "episode_return": -730.3223333333331,
+    "actions": {
+      "assign": 205,
+      "charge": 1039,
+      "noop": 683,
+      "charge_open_steps": 1306
+    }
   }
 }

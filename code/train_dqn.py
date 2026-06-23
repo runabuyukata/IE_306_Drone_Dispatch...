@@ -86,8 +86,11 @@ def train(config_path: str):
     Path(train_cfg["weight_path"]).parent.mkdir(parents=True, exist_ok=True)
 
     global_step = 0
+    train_updates = 0
+    episode = 0
     rows = []
-    for episode in range(int(train_cfg["episodes"])):
+    total_steps = int(train_cfg["total_steps"])
+    while global_step < total_steps:
         obs, _ = env.reset(seed=seed * 100000 + episode)
         ep_return = 0.0
         last_loss = ""
@@ -144,11 +147,12 @@ def train(config_path: str):
                 nn.utils.clip_grad_norm_(q_net.parameters(), 10.0)
                 optimizer.step()
                 last_loss = float(loss.item())
+                train_updates += 1
 
             if global_step % int(train_cfg["target_update_every"]) == 0:
                 target_net.load_state_dict(q_net.state_dict())
 
-            if done:
+            if done or global_step >= total_steps:
                 break
 
         rows.append(
@@ -162,13 +166,15 @@ def train(config_path: str):
                 "charge_actions": action_counts["charge"],
                 "noop_actions": action_counts["noop"],
                 "charge_open_steps": charge_open_steps,
+                "train_updates": train_updates,
             }
         )
         print(
             f"episode={episode} step={global_step} return={ep_return:.2f} "
             f"epsilon={rows[-1]['epsilon']:.3f} loss={last_loss} "
-            f"charge={action_counts['charge']}/{charge_open_steps}"
+            f"charge={action_counts['charge']}/{charge_open_steps} updates={train_updates}"
         )
+        episode += 1
 
     with open(train_cfg["log_path"], "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(
@@ -183,6 +189,7 @@ def train(config_path: str):
                 "charge_actions",
                 "noop_actions",
                 "charge_open_steps",
+                "train_updates",
             ],
         )
         writer.writeheader()

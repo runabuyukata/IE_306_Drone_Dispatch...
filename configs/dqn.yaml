@@ -1,8 +1,8 @@
 env_config: configs/eval_standard.yaml
 seed: 0
-episodes: 80
+total_steps: 60000
 max_steps_per_episode: 1000
-buffer_size: 50000
+buffer_size: 100000
 batch_size: 128
 gamma: 0.99
 learning_rate: 0.0005
@@ -12,7 +12,7 @@ train_every: 4
 target_update_every: 1000
 epsilon_start: 1.0
 epsilon_end: 0.05
-epsilon_decay_steps: 20000
+epsilon_decay_steps: 40000
 double_dqn: false
 dueling: false
 log_path: logs/dqn_seed0.csv
