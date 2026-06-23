@@ -1,0 +1,17 @@
+{
+  "weights": "weights/dqn_seed0.pt",
+  "seeds": [0, 1, 2],
+  "results": {
+    "cost_per_order": 17.62374967624967,
+    "success_rate": 0.9283643892339546,
+    "ontime_rate": 0.9876543209876543,
+    "mean_delivery_time": 28.101139601139604,
+    "energy_per_order": 0.32305037555037064,
+    "depletion_events": 8.0,
+    "idle_pct": 0.13400688839977173,
+    "charger_utilization": 0.0,
+    "n_delivered": 25.0,
+    "n_dropped": 2.0,
+    "episode_return": -64.84700000000005
+  }
+}
