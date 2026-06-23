@@ -92,9 +92,15 @@ def train(config_path: str):
         ep_return = 0.0
         last_loss = ""
         done = False
+        action_counts = {"assign": 0, "charge": 0, "noop": 0}
+        charge_open_steps = 0
         for _ in range(int(train_cfg["max_steps_per_episode"])):
             eps = epsilon_by_step(global_step, train_cfg)
+            charge_indices = [env_cfg.charge_index(d) for d in range(env_cfg.n_drones)]
+            if np.asarray(obs["action_mask"], dtype=bool)[charge_indices].any():
+                charge_open_steps += 1
             action = choose_action(q_net, obs, env_cfg, eps, device)
+            action_counts[env_cfg.decode(action)[0]] += 1
             next_obs, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
 
@@ -152,12 +158,33 @@ def train(config_path: str):
                 "episode_return": ep_return,
                 "epsilon": epsilon_by_step(global_step, train_cfg),
                 "loss": last_loss,
+                "assign_actions": action_counts["assign"],
+                "charge_actions": action_counts["charge"],
+                "noop_actions": action_counts["noop"],
+                "charge_open_steps": charge_open_steps,
             }
         )
-        print(f"episode={episode} step={global_step} return={ep_return:.2f} epsilon={rows[-1]['epsilon']:.3f} loss={last_loss}")
+        print(
+            f"episode={episode} step={global_step} return={ep_return:.2f} "
+            f"epsilon={rows[-1]['epsilon']:.3f} loss={last_loss} "
+            f"charge={action_counts['charge']}/{charge_open_steps}"
+        )
 
     with open(train_cfg["log_path"], "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["episode", "step", "episode_return", "epsilon", "loss"])
+        writer = csv.DictWriter(
+            f,
+            fieldnames=[
+                "episode",
+                "step",
+                "episode_return",
+                "epsilon",
+                "loss",
+                "assign_actions",
+                "charge_actions",
+                "noop_actions",
+                "charge_open_steps",
+            ],
+        )
         writer.writeheader()
         writer.writerows(rows)
 
