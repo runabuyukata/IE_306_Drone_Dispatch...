@@ -1,0 +1,32 @@
+# 3-seed deliverable (seed 1). Same base as dueling_dqn_nstep_600k.yaml.
+env_config: configs/eval_standard.yaml
+seed: 1
+total_steps: 600000
+max_steps_per_episode: 1000
+buffer_size: 100000
+batch_size: 128
+gamma: 0.99
+learning_rate: 0.0001
+reward_scale: 10.0
+normalize_time: true
+n_step: 3
+hidden_sizes:
+- 256
+- 256
+learning_starts: 1000
+train_every: 4
+target_update_every: 1000
+epsilon_start: 1.0
+epsilon_end: 0.05
+epsilon_decay_steps: 40000
+double_dqn: false
+dueling: true
+eval_every: 20000
+eval_seeds:
+- 0
+- 1
+- 2
+log_path: logs/dueling_dqn_nstep_600k_seed1.csv
+eval_log_path: logs/dueling_dqn_nstep_600k_seed1_eval.csv
+weight_path: weights/dueling_dqn_nstep_600k_seed1.pt
+checkpoint_interval: 100000

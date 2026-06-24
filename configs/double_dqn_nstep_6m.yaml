@@ -1,0 +1,34 @@
+# 6M extension of Double DQN n=3 (seed 0). Tests whether the post-~2.5M
+# divergence seen at 3M is permanent or cyclical. 3M data predicts best
+# checkpoint stays ~1M (cost 6.76); this is a diagnostic data point.
+env_config: configs/eval_standard.yaml
+seed: 0
+total_steps: 6000000
+max_steps_per_episode: 1000
+buffer_size: 100000
+batch_size: 128
+gamma: 0.99
+learning_rate: 0.0001
+reward_scale: 10.0
+normalize_time: true
+n_step: 3
+hidden_sizes:
+- 256
+- 256
+learning_starts: 1000
+train_every: 4
+target_update_every: 1000
+epsilon_start: 1.0
+epsilon_end: 0.05
+epsilon_decay_steps: 40000
+double_dqn: true
+dueling: false
+eval_every: 50000
+eval_seeds:
+- 0
+- 1
+- 2
+log_path: logs/double_dqn_nstep_6m.csv
+eval_log_path: logs/double_dqn_nstep_6m_eval.csv
+weight_path: weights/double_dqn_nstep_6m.pt
+checkpoint_interval: 250000
