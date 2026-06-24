@@ -1,0 +1,19 @@
+{
+  "cost_per_order": 6.756931788930569,
+  "success_rate": 0.7493915398327163,
+  "ontime_rate": 0.797757725542732,
+  "mean_delivery_time": 44.11163348295517,
+  "energy_per_order": 0.29615519897396675,
+  "depletion_events": 2.3333333333333335,
+  "idle_pct": 0.029683096961393388,
+  "charger_utilization": 0.14999516278737804,
+  "n_delivered": 101.33333333333333,
+  "n_dropped": 34.333333333333336,
+  "episode_return": 738.1840000000005,
+  "actions": {
+    "assign": 376,
+    "charge": 195,
+    "noop": 40,
+    "charge_open_steps": 436
+  }
+}
