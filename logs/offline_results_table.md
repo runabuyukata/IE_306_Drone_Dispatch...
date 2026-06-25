@@ -21,5 +21,12 @@ Weight: `weights/offline_cql.pt` (run_all.py bunu yükleyip aynı env'de doğrul
 Greedy/online seviyesine ulaşmıyor (model-free hiçbir metot burada greedy'yi geçmiyor) ama
 ödevin iki şartı da sağlandı. Kaynak: Kumar ve ark., Conservative Q-Learning, NeurIPS 2020.
 
+**Uyarı — tek koşu:** Bu offline sayıları metot başına tek seedli koşu (Role A eğrileri gibi
+3-seed mean±std değil) ve yüksek varyanslı. Sağlam olan **sıralama** (CQL < naive < BC, naive'in
+Q'su patlıyor); kesin değerler değil. 2–3 seedli offline sweep doğal sonraki adım.
+
+Not (timeout): `done = terminals` — d4rl konvansiyonu, truncation/timeout terminal değil,
+backup'ta bootstrap edilir; `timeouts` dizisi zaten bunu dışlamak için ayrı tutuluyor.
+
 Veri seti: `offline_*.npz` repo'ya konmadı (büyük); `offline_dlogs.zip` ayrı branch'te,
 üye npz'leri kendi repolarında. Havuzu yeniden üret: `python pool_offline.py offline_pool.npz offline_dlogs.npz offline_ozan_karhan.npz offline_runa.npz`.
