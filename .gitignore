@@ -1,2 +1,20 @@
 *.npz
 __pycache__/
+.pytest_cache/
+
+# intermediate training checkpoints (keep only final/selected weights)
+weights/*_step_*.pt
+!weights/double_dqn_nstep_3m_step_1000000.pt
+
+# verbose run logs (keep eval CSVs and ablation logs, not these)
+logs/*_stdout.log
+logs/_*_driver.log
+logs/*rerun*.log
+logs/*_run.log
+
+# local-only report render (kept out of git intentionally)
+report.html
+
+# scratch dashboards
+proje_durum.html
+ozet_checklist.html
