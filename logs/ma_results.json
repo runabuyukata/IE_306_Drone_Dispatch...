@@ -1,0 +1,21 @@
+{
+  "idqn_ma": {
+    "return": 793.7610000000001,
+    "cost_per_order": 6.490736967556249,
+    "delivered": 100.66666666666667
+  },
+  "random_ma": {
+    "return": 433.7549999999992,
+    "cost_per_order": 8.804151446964335,
+    "delivered": 85.33333333333333
+  },
+  "ref_centralized_double_dqn": {
+    "cost_per_order": 6.76,
+    "note": "different env/action abstraction; paradigm reference, not identical metric"
+  },
+  "eval_seeds": [
+    0,
+    1,
+    2
+  ]
+}
