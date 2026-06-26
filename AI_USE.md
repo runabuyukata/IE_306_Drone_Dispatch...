@@ -1,1 +1,1 @@
-AI tools were leveraged strictly for operational support, focusing solely on routine debugging, organizing experimental logs, and basic editorial checks to ensure assignment compliance prior to submission.
+AI tools (Claude and ChatGPT) were leveraged strictly for operational support, focusing solely on debugging, organizing experimental logs, git-github setups and basic editorial checks to ensure assignment compliance prior to submission.
