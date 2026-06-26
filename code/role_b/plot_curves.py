@@ -125,7 +125,7 @@ def plot_ablation():
     ax.errorbar(lams, means, yerr=stds, marker="o", capsize=4)
     ax.set_xlabel("GAE lambda")
     ax.set_ylabel("best val cost_per_order")
-    ax.set_title("GAE-lambda ablation on A2C (mean +/- std, 2 seeds)")
+    ax.set_title("GAE-lambda ablation on A2C (mean +/- std, 3 seeds)")
     fig.tight_layout()
     fig.savefig(f"{FIG}/ablation_gae.png", dpi=120)
     print(f"wrote {FIG}/ablation_gae.png")

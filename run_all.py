@@ -82,6 +82,30 @@ def eval_ddpg_policy(path, cfg, seeds, device="cpu"):
     return eval_ddpg(actor, cfg, seeds, torch.device(device))
 
 
+def eval_go_straight(cfg, seeds):
+    """Go-straight baseline on DroneControl-v0 (the DDPG comparison bar)."""
+    from drone_dispatch_env.env_control import DroneControlEnv
+    from role_b.adapters import GoStraight
+    from role_b.ddpg import _clip_action
+    env = DroneControlEnv(cfg)
+    pol = GoStraight(cfg)
+    rets, succ, steps = [], [], []
+    for s in seeds:
+        obs, _ = env.reset(seed=int(s))
+        done, ret, n, last_term = False, 0.0, 0, False
+        while not done:
+            obs, r, term, trunc, _ = env.step(_clip_action(pol.act(obs)))
+            ret += r
+            n += 1
+            last_term = term
+            done = term or trunc
+        rets.append(ret)
+        succ.append(1.0 if (last_term and obs[2] > 0.0) else 0.0)
+        steps.append(n)
+    return {"return": float(np.mean(rets)), "success_rate": float(np.mean(succ)),
+            "mean_steps": float(np.mean(steps))}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="configs/eval_standard.yaml")
@@ -136,12 +160,20 @@ def main():
 
     ddpg_path = Path("weights/ddpg.pt")
     if ddpg_path.exists():
+        gs = eval_go_straight(cfg, seeds)
         ddpg = eval_ddpg_policy(ddpg_path, cfg, seeds)
-        ddpg_line = (f"DDPG (DroneControl-v0): return={ddpg['return']:.2f} "
+        gs_line = (f"go_straight (baseline):  return={gs['return']:.2f} "
+                   f"success={gs['success_rate']:.3f} "
+                   f"mean_steps={gs['mean_steps']:.1f}")
+        ddpg_line = (f"DDPG (DroneControl-v0):  return={ddpg['return']:.2f} "
                      f"success={ddpg['success_rate']:.3f} "
                      f"mean_steps={ddpg['mean_steps']:.1f}")
-        lines += ["", "-- Role B continuous control (separate env) --", ddpg_line]
+        lines += ["", "-- Role B continuous control (separate env) --",
+                  gs_line, ddpg_line]
         md += ["", "## Role B continuous control", "",
+               f"go_straight baseline: return = {gs['return']:.2f}, "
+               f"success = {gs['success_rate']:.3f}, "
+               f"mean steps = {gs['mean_steps']:.1f}.",
                f"DDPG on DroneControl-v0: return = {ddpg['return']:.2f}, "
                f"success = {ddpg['success_rate']:.3f}, "
                f"mean steps = {ddpg['mean_steps']:.1f}."]

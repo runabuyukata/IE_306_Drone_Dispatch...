@@ -2,7 +2,7 @@
 
 Reads `logs/*_eval.csv` (columns step, eval_cost_per_order, eval_episode_return),
 aligns the three seeds on their common steps, and plots the mean with a ±std band
-(not three overlaid lines). Writes PNGs to logs/.
+(not three overlaid lines). Writes PNGs to figures/.
 
     python code/plot_curves.py
 """
@@ -61,13 +61,13 @@ def main():
     n_seeds = sum(Path(p).exists() for p in G600["Double DQN n=3"])
     print(f"Double DQN 600k seeds found: {n_seeds}")
     plot_methods(G600, "eval_cost_per_order", "cost_per_order (lower better)",
-                 "600k — 3-seed mean ± std (cost)", f"{L}/curves_methods_600k_cost.png", ymax=60)
+                 "600k — 3-seed mean ± std (cost)", "figures/curves_methods_600k_cost.png", ymax=60)
     plot_methods(G600, "eval_episode_return", "episode_return",
-                 "600k — 3-seed mean ± std (return)", f"{L}/curves_methods_600k_return.png")
+                 "600k — 3-seed mean ± std (return)", "figures/curves_methods_600k_return.png")
     plot_methods({"Double DQN n=3 (3M)": DBL3M}, "eval_cost_per_order",
                  "cost_per_order (lower better)",
                  "Double DQN 3M — 3-seed mean ± std (good band then divergence)",
-                 f"{L}/curves_double_3m_cost.png", ymax=90)
+                 "figures/curves_double_3m_cost.png", ymax=90)
 
 
 if __name__ == "__main__":

@@ -52,6 +52,29 @@ from-scratch DQN would be misleading.
 | Factored, warm-start only (0 TD steps) | 3.28 ± 0.16 | 0.872 |
 | **Factored Double DQN, best checkpoint** | **2.29 ± 0.41** | **0.883** |
 
+**DQN → Double DQN → Dueling DQN (flat assignment env).** The figures below are
+the required ≥3-seed mean±std learning curves for the three flat value-based
+variants at 600k steps, on both metrics. Double DQN (orange) is the clear winner
+of the family: lowest `cost_per_order` with the tightest seed band (~16–22) and
+the highest `episode_return`; plain DQN (blue) is noisier and ~5–10 cost worse;
+Dueling DQN (green) is the weakest — highest cost, lowest return, and the widest
+±std band (spiking past 40). This ordering is exactly why the flat line was
+carried forward as Double DQN rather than the dueling variant.
+
+![DQN vs Double vs Dueling — cost (600k, 3-seed mean±std)](figures/curves_methods_600k_cost.png)
+
+![DQN vs Double vs Dueling — return (600k, 3-seed mean±std)](figures/curves_methods_600k_return.png)
+
+Crucially, *none* of the three flat variants approaches the greedy bar of 4.57:
+they all plateau around 16–22 cost. Extending the best one (Double DQN) to 3M
+steps confirms both the ceiling and the failure mode — it dips into a good
+~9–10 band between roughly 1.0M and 2.0M steps but never stably beats greedy and
+then **diverges back to ~30** by 3M. This is the value-based bootstrapping
+instability that motivated replacing the flat representation with the factored
+Double DQN.
+
+![Double DQN extended to 3M — good band then divergence (3-seed mean±std)](figures/curves_double_3m_cost.png)
+
 The TD learning is not cosmetic on top of the warm start. With 0 TD steps the
 network is a pure imitation of the Role-C depth-1 planner; it already beats
 greedy at **3.28 ± 0.16**, but Double-DQN training lowers cost to
@@ -138,58 +161,84 @@ instance of this published pattern.
 
 ### 3.1 Methods
 
-REINFORCE uses likelihood-ratio policy gradients with a learned value baseline
-and GAE. A2C uses the same factored actor-critic but collects fixed-length
-rollouts and bootstraps from the critic, reducing variance. Invalid dispatch
-actions are masked. DDPG uses a deterministic continuous actor, Q critic,
-replay buffer, target networks, Polyak averaging, and OU exploration on
-`DroneControl-v0`.
+All dispatch methods share a **factored, permutation-invariant** actor-critic
+whose parameters do not depend on the action count, so the same weights load on
+a held-out config with a different `k_max` or grid size. Per-(drone, order)
+features include the no-fly-aware BFS routed distance (drone→pickup,
+pickup→dropoff), deadline feasibility, and battery feasibility, computed only
+from `obs["grid"]` via a self-contained router (`code/role_b/routing.py`), so
+the policy sees the same distance information `greedy_nearest` uses.
+
+REINFORCE uses likelihood-ratio policy gradients with a learned GAE value
+baseline; A2C uses the same network but bootstraps fixed-length rollouts from
+the critic, cutting variance. Invalid dispatch actions are masked. DDPG uses a
+deterministic continuous actor (speed, heading), a Q critic, target networks
+with Polyak averaging, replay, and decaying Ornstein–Uhlenbeck exploration on
+`DroneControl-v0`, with an optional TD3 stabiliser (clipped double-Q, target
+smoothing, delayed updates).
 
 ### 3.2 Dispatch results
 
 | Method | cost/order, mean ± std | success |
 |---|---:|---:|
-| REINFORCE + GAE | 2.72 ± 0.73 | 0.878 |
+| REINFORCE + GAE | 2.57 ± 0.86 | 0.903 |
 | **A2C** | **1.09 ± 0.43** | **0.976** |
 
-A2C is the most reliable learned dispatcher. Its three saved training models
-also beat greedy on seeds 0–4, whereas REINFORCE is highly seed-sensitive.
-The difference is consistent with the lower-variance bootstrapped updates used
-by A2C.
+Both beat greedy (4.57) decisively. A2C reaches the lowest cost with the least
+compute — the textbook payoff of bootstrapping over high-variance Monte-Carlo
+returns. Across the three *training* seeds the saved models give A2C
+**1.55 ± 0.21** and REINFORCE **2.65 ± 0.09**, both beating greedy on every
+seed. REINFORCE was previously seed-sensitive (only ~1/3 of seeds delivered);
+a behavior-cloning warm-start of `greedy_nearest` puts every seed in the
+delivering regime, after which REINFORCE reliably refines *below* greedy. A2C
+needs no warm-start — its bootstrapped advantages are already low-variance.
 
 ![Role B dispatch curves](figures/dispatch_curves.png)
 
 ### 3.3 Required ablation: GAE λ
 
-The A2C sweep used λ ∈ {0, 0.9, 0.95, 0.99, 1.0}, two training seeds, and a
-40k-step budget.
+The A2C sweep used λ ∈ {0, 0.9, 0.95, 0.99, 1.0}, **three training seeds**, and
+a 40k-step budget.
 
 | λ | mean best validation cost |
 |---:|---:|
-| 0.0 | 13.82 |
-| 0.9 | 0.77 |
-| **0.95** | **0.76** |
-| 0.99 | 0.89 |
-| 1.0 | 0.90 |
+| 0.0 | 13.85 |
+| 0.9 | 0.75 |
+| **0.95** | **0.69** |
+| 0.99 | 0.80 |
+| 1.0 | 1.11 |
 
-One-step advantages are too myopic; λ around 0.9–0.95 balances bias and
-variance. Although the main methods have three training seeds, this reduced
-ablation has two seeds and should be interpreted as a controlled design check.
+This is the textbook bias/variance tradeoff. λ = 0 (one-step TD) is too myopic
+and never beats greedy (13.85); λ = 0.9–0.95 balances bias and variance and is
+optimal (≈0.69); λ = 1.0 (the Monte-Carlo advantage, unbiased but
+high-variance) degrades it again (1.11). This validates the GAE(0.95) default
+used for the headline A2C and REINFORCE runs.
 
 ![GAE ablation](figures/ablation_gae.png)
 
-### 3.4 DDPG result and failure
+### 3.4 DDPG result
 
-On seeds 0–2, the current go-straight controller obtains mean return **26.37**,
-success **1.00**, and 11.7 steps. The selected DDPG checkpoint obtains return
-**−69.66**, success **0.00**, and 234.3 steps. DDPG therefore does **not** beat
-its controller baseline. It learned conservative movement that avoided some
-large penalties but failed to reach the target. This remains an unresolved
-Role-B weakness rather than a successful result.
+DDPG now **beats go-straight decisively** on `DroneControl-v0`. Over seeds 0–4
+it reaches the target on **every** eval episode (success **1.00**, return
+**+20.70**), while go-straight crashes into no-fly cells (−25 each) and scores
+return **−417.43**, success 0.80. On the validation pool (seeds 200–204) the
+gap is the same: DDPG +12.72 / 1.00 vs go-straight −871.52 / 0.60.
 
-The main engineering fix for A2C was reward scaling and Huber value loss:
-unscaled value targets produced losses around 25,000 and suppressed useful
-policy gradients.
+The comparison only collapses on the three "easy" seeds 0–2, where a straight
+path is unobstructed and both controllers reach 100% success (go-straight 26.37,
+DDPG 25.91); the moment a wall lies on the path, go-straight fails and the
+learned obstacle-avoiding DDPG wins. Two fixes were decisive: selecting the
+checkpoint on validation **success** rather than return (the target-reaching
+policy appears late in training and was previously discarded), and decaying OU
+exploration with a minimum-speed floor; an optional TD3 variant reaches the same
+100% success with lower across-seed variance.
+
+A separate engineering fix carried both dispatch methods: reward scaling ×0.1
+plus a Huber value loss. Unscaled targets produced value losses around 25,000
+that drowned the policy gradient, so the agent never learned to charge; with the
+fix `value_loss` dropped to ≈5 and A2C beat greedy within ~10k steps.
+
+![DDPG vs go-straight on DroneControl-v0](figures/ddpg_curve.png)
 
 ## 4. Role C — Planning (Tuba Nur Büyükata)
 
@@ -294,6 +343,8 @@ Parameter sharing reduces but does not remove this moving-target problem.
 - **GAE:** Schulman et al. (2016), chosen for its explicit bias/variance λ knob.
 - **A2C/A3C:** Mnih et al. (2016); we use the synchronous A2C variant.
 - **DDPG:** Lillicrap et al. (2016), chosen for continuous speed/heading actions.
+- **TD3:** Fujimoto et al. (2018), added as a config-gated DDPG stabiliser
+  (clipped double-Q, target smoothing, delayed actor updates).
 - **Rollout planning:** Sutton & Barto, Chapter 8, and Tesauro & Galperin
   (1996), motivating decision-time policy improvement.
 - **CQL:** Kumar et al. (2020), chosen to penalize unsupported offline actions.
@@ -307,9 +358,11 @@ the final saved policies for every role and both joint components. The simulator
 tests pass **17/17**.
 
 The strongest methods are A2C, factored Double DQN, and the depth-1 planner.
-Offline CQL satisfies the required failure-and-fix comparison. DDPG and
-three-seed IDQN remain honest negative results: they run end-to-end, but do not
-meet their respective baselines reliably.
+DDPG now beats its go-straight baseline (100% target-reaching success on the
+held-out seed range), and offline CQL satisfies the required failure-and-fix
+comparison. The three-seed IDQN remains an honest negative result: it runs
+end-to-end and beats random at 60k steps, but does not converge to the
+centralized policy in an equal training budget.
 
 ## References
 

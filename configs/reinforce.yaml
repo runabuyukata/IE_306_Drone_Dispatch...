@@ -1,6 +1,3 @@
-# REINFORCE + GAE on DroneDispatch-v0 (Role B)
-# Run: python code/role_b/train_reinforce.py --config configs/reinforce.yaml --seed 0
-
 env:
   H: 20
   W: 20
@@ -13,7 +10,7 @@ env:
   e_move: 0.01
   e_idle: 0.001
   c_rate: 0.05
-  charge_threshold: 0.30
+  charge_threshold: 0.3
   n_nofly: 24
   n_hubs: 4
   init_soc: 1.0
@@ -25,9 +22,7 @@ env:
     r_energy: -1.0
     r_depletion: -50.0
     r_noop: -0.01
-
-# --- algorithm ---
-lr: 0.0003
+lr: 0.0002
 gamma: 0.99
 gae_lambda: 0.95
 ent_coef: 0.01
@@ -37,6 +32,16 @@ max_grad_norm: 0.5
 norm_adv: true
 reward_scale: 0.1
 steps_per_update: 2048
-total_steps: 140000
+total_steps: 180000
 eval_every_updates: 5
-val_seeds: [200, 201, 202]
+val_seeds:
+- 200
+- 201
+- 202
+- 203
+- 204
+value_epochs: 2
+lr_final_frac: 0.2
+bc_warmup_updates: 40
+bc_dataset_steps: 40000
+bc_lr: 0.001
