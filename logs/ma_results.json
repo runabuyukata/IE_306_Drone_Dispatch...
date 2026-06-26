@@ -1,18 +1,94 @@
 {
+  "per_training_seed": {
+    "0": {
+      "idqn_ma": {
+        "return": -986.1326666666611,
+        "cost_per_order": 55.332321590038084,
+        "delivered": 26.0
+      },
+      "random_ma": {
+        "return": 433.7549999999992,
+        "cost_per_order": 9.233679720486231,
+        "delivered": 85.33333333333333
+      },
+      "training_seed": 0,
+      "eval_seeds": [
+        0,
+        1,
+        2
+      ]
+    },
+    "1": {
+      "idqn_ma": {
+        "return": -882.7516666666612,
+        "cost_per_order": 44.173363756613576,
+        "delivered": 30.333333333333332
+      },
+      "random_ma": {
+        "return": 433.7549999999992,
+        "cost_per_order": 9.233679720486231,
+        "delivered": 85.33333333333333
+      },
+      "training_seed": 1,
+      "eval_seeds": [
+        0,
+        1,
+        2
+      ]
+    },
+    "2": {
+      "idqn_ma": {
+        "return": -191.72333333333077,
+        "cost_per_order": 17.901728592545634,
+        "delivered": 71.66666666666667
+      },
+      "random_ma": {
+        "return": 433.7549999999992,
+        "cost_per_order": 9.233679720486231,
+        "delivered": 85.33333333333333
+      },
+      "training_seed": 2,
+      "eval_seeds": [
+        0,
+        1,
+        2
+      ]
+    }
+  },
+  "aggregate": {
+    "idqn_ma": {
+      "cost_per_order_mean": 39.1358046463991,
+      "cost_per_order_std": 15.69065697323647,
+      "return_mean": -686.8692222222177,
+      "return_std": 352.6556358573469,
+      "delivered_mean": 42.666666666666664,
+      "delivered_std": 20.58226492953654
+    }
+  },
+  "selected_seed": 2,
+  "selected_source": "extended 60k seed-0 checkpoint",
   "idqn_ma": {
     "return": 793.7610000000001,
-    "cost_per_order": 6.490736967556249,
-    "delivered": 100.66666666666667
+    "cost_per_order": 6.65359672684458,
+    "delivered": 100.66666666666667,
+    "note": "extended 60k seed-0 checkpoint from the original run"
+  },
+  "extended_checkpoint": {
+    "return": 793.7610000000001,
+    "cost_per_order": 6.65359672684458,
+    "delivered": 100.66666666666667,
+    "note": "extended 60k seed-0 checkpoint from the original run"
   },
   "random_ma": {
     "return": 433.7549999999992,
-    "cost_per_order": 8.804151446964335,
+    "cost_per_order": 9.233679720486231,
     "delivered": 85.33333333333333
   },
-  "ref_centralized_double_dqn": {
-    "cost_per_order": 6.76,
-    "note": "different env/action abstraction; paradigm reference, not identical metric"
-  },
+  "training_seeds": [
+    0,
+    1,
+    2
+  ],
   "eval_seeds": [
     0,
     1,

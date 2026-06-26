@@ -1,0 +1,18 @@
+{
+  "idqn_ma": {
+    "return": -986.1326666666611,
+    "cost_per_order": 55.332321590038084,
+    "delivered": 26.0
+  },
+  "random_ma": {
+    "return": 433.7549999999992,
+    "cost_per_order": 9.233679720486231,
+    "delivered": 85.33333333333333
+  },
+  "training_seed": 0,
+  "eval_seeds": [
+    0,
+    1,
+    2
+  ]
+}

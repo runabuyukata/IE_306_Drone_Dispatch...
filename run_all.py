@@ -1,11 +1,11 @@
-"""Reproduce the Role-A results table: load saved DQN policies and compare them
-to the shipped baselines (random, greedy_nearest, milp_rolling) on a config.
+"""Reproduce the complete team results table from saved policies.
 
 Single command (config + seeds overridable so the grader can swap in held-out):
     python run_all.py --config configs/eval_standard.yaml --seeds 0,1,2
 
 Prints cost_per_order (mean +/- std over seeds, the primary metric) and success
-rate, and writes logs/run_all_table.md. The objective bar is greedy_nearest.
+rate, and writes logs/run_all_table.md. Continuous-control DDPG and the
+multi-agent policy are reported separately because they use different envs.
 """
 from __future__ import annotations
 
@@ -21,6 +21,9 @@ from drone_dispatch_env.baselines import make_baseline
 from drone_dispatch_env.config import Config
 from drone_dispatch_env.evaluate import evaluate
 from dqn_agent import load_policy
+from train_factored_dqn import load_policy as load_factored_dqn
+from role_b.adapters import load_dispatch_agent
+from role_c.role_c_rollout import RoleCRolloutPlanner
 
 # One file per learned method. Double DQN uses its best (validation-selected) 1M
 # checkpoint; see logs/engineering_log.md for why (it diverges after ~2.5M).
@@ -28,6 +31,10 @@ METHODS = {
     "DQN n=3":         "weights/dqn_nstep_600k.pt",
     "Double DQN n=3":  "weights/double_dqn_nstep_3m_step_1000000.pt",
     "Dueling DQN n=3": "weights/dueling_dqn_nstep_600k.pt",
+}
+ROLE_B_METHODS = {
+    "REINFORCE + GAE": "weights/reinforce.pt",
+    "A2C": "weights/a2c.pt",
 }
 BASELINES = ["random", "greedy_nearest", "milp_rolling"]
 # Joint methods (separate weights). CQL runs on the same centralized env so it
@@ -64,6 +71,17 @@ def eval_ma_policy(path, cfg, seeds, device="cpu"):
     return eval_ma(net, cfg, device, policy="greedy", seeds=seeds)
 
 
+def eval_ddpg_policy(path, cfg, seeds, device="cpu"):
+    import torch
+    from role_b.ddpg import eval_ddpg
+    from role_b.networks import DDPGActor
+    ck = torch.load(path, map_location=device, weights_only=False)
+    actor = DDPGActor(ck["obs_dim"], ck["hidden"])
+    actor.load_state_dict(ck["state_dict"])
+    actor.eval()
+    return eval_ddpg(actor, cfg, seeds, torch.device(device))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="configs/eval_standard.yaml")
@@ -79,9 +97,34 @@ def main():
         if not Path(wp).exists():
             rows.append((f"{name} [weights missing]", float("nan"), 0.0, 0.0))
             continue
-        rows.append((name, *stats(evaluate(load_policy(wp), cfg, seeds))))
+        try:
+            rows.append((name, *stats(evaluate(load_policy(wp), cfg, seeds))))
+        except (RuntimeError, ValueError) as exc:
+            rows.append((f"{name} [config-incompatible]", float("nan"),
+                         float("nan"), 0.0))
+    factored_path = Path("weights/factored_double_dqn.pt")
+    if factored_path.exists():
+        rows.append(("Factored Double DQN (demo warm-start)",
+                     *stats(evaluate(
+                         load_factored_dqn(
+                             factored_path, cfg_override=cfg), cfg, seeds))))
+    for name, wp in ROLE_B_METHODS.items():
+        if not Path(wp).exists():
+            rows.append((f"{name} [weights missing]", float("nan"), 0.0, 0.0))
+            continue
+        rows.append((name, *stats(evaluate(load_dispatch_agent(wp, cfg), cfg, seeds))))
+    role_c = RoleCRolloutPlanner.from_yaml(
+        cfg, "configs/role_c_rollout.yaml", depth=1)
+    rows.append(("Role C rollout depth=1",
+                 *stats(evaluate(role_c, cfg, seeds))))
     if Path(CQL_WEIGHTS).exists():  # joint offline method, same centralized env
-        rows.append(("Offline CQL (joint)", *stats(evaluate(load_cql_policy(CQL_WEIGHTS), cfg, seeds))))
+        try:
+            rows.append(("Offline CQL (joint)",
+                         *stats(evaluate(
+                             load_cql_policy(CQL_WEIGHTS), cfg, seeds))))
+        except (RuntimeError, ValueError):
+            rows.append(("Offline CQL (joint) [config-incompatible]",
+                         float("nan"), float("nan"), 0.0))
 
     header = f"Eval config = {args.config} | seeds = {seeds} | primary metric = cost_per_order (lower better)"
     lines = [header, "", f"{'policy':24} {'cost/order (mean+/-std)':26} {'success':>8}", "-" * 60]
@@ -90,6 +133,18 @@ def main():
     for name, m, s, sr in rows:
         lines.append(f"{name:24} {m:8.2f} +/- {s:5.2f}        {sr:8.3f}")
         md.append(f"| {name} | {m:.2f} ± {s:.2f} | {sr:.3f} |")
+
+    ddpg_path = Path("weights/ddpg.pt")
+    if ddpg_path.exists():
+        ddpg = eval_ddpg_policy(ddpg_path, cfg, seeds)
+        ddpg_line = (f"DDPG (DroneControl-v0): return={ddpg['return']:.2f} "
+                     f"success={ddpg['success_rate']:.3f} "
+                     f"mean_steps={ddpg['mean_steps']:.1f}")
+        lines += ["", "-- Role B continuous control (separate env) --", ddpg_line]
+        md += ["", "## Role B continuous control", "",
+               f"DDPG on DroneControl-v0: return = {ddpg['return']:.2f}, "
+               f"success = {ddpg['success_rate']:.3f}, "
+               f"mean steps = {ddpg['mean_steps']:.1f}."]
     # Multi-agent: different env (DroneDispatchMA-v0), reported separately. Its
     # cost_per_order is reconstructed from the reward stream (see train_ma_idqn).
     if Path(MA_WEIGHTS).exists():

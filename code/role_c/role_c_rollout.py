@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+from collections import deque
+from pathlib import Path
+
 import numpy as np
+import yaml
 
 from drone_dispatch_env import Config
-from drone_dispatch_env.config import CHARGER
-from drone_dispatch_env.world import Router
+
+NOFLY = 1
+CHARGER = 3
 
 
 class RoutedDistance:
@@ -24,7 +29,6 @@ class RoutedDistance:
         key = grid.tobytes()
         if key != self._grid_key:
             self._grid_key = key
-            self._router = Router(grid, self.cfg.neighborhood)
             self._fields = {}
 
     def dist(self, grid, source, target) -> float:
@@ -34,7 +38,7 @@ class RoutedDistance:
 
         field = self._fields.get(source)
         if field is None:
-            field = self._router.dist_field(source)
+            field = self._dist_field(np.asarray(grid), source)
             self._fields[source] = field
 
         d = float(field[target[0], target[1]])
@@ -43,6 +47,28 @@ class RoutedDistance:
 
         # safety fallback
         return abs(source[0] - target[0]) + abs(source[1] - target[1])
+
+    def _dist_field(self, grid, source):
+        h, w = grid.shape
+        dist = np.full((h, w), np.inf, dtype=np.float32)
+        sx, sy = source
+        if not (0 <= sx < h and 0 <= sy < w) or grid[sx, sy] == NOFLY:
+            return dist
+        dist[sx, sy] = 0.0
+        q = deque([(sx, sy)])
+        moves = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        if self.cfg.neighborhood == 8:
+            moves += [(-1, -1), (-1, 1), (1, -1), (1, 1)]
+        while q:
+            x, y = q.popleft()
+            nd = dist[x, y] + 1.0
+            for mx, my in moves:
+                nx, ny = x + mx, y + my
+                if (0 <= nx < h and 0 <= ny < w
+                        and grid[nx, ny] != NOFLY and nd < dist[nx, ny]):
+                    dist[nx, ny] = nd
+                    q.append((nx, ny))
+        return dist
 
 
 class RoleCRolloutPlanner:
@@ -65,12 +91,41 @@ class RoleCRolloutPlanner:
         depth: int = 2,
         reserve_soc: float = 0.08,
         emergency_soc: float = 0.22,
+        pickup_weight: float = 1.0,
+        delivery_weight: float = 0.75,
+        lateness_weight: float = 8.0,
+        battery_weight: float = 150.0,
+        age_weight: float = -0.15,
+        post_charge_weight: float = 0.25,
     ):
         self.cfg = cfg
         self.depth = int(depth)
         self.reserve_soc = float(reserve_soc)
         self.emergency_soc = float(emergency_soc)
+        self.pickup_weight = float(pickup_weight)
+        self.delivery_weight = float(delivery_weight)
+        self.lateness_weight = float(lateness_weight)
+        self.battery_weight = float(battery_weight)
+        self.age_weight = float(age_weight)
+        self.post_charge_weight = float(post_charge_weight)
         self.routed = RoutedDistance(cfg)
+
+    @classmethod
+    def from_yaml(cls, cfg: Config, path: str, depth: int | None = None):
+        raw = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+        weights = raw.get("score_weights", {})
+        return cls(
+            cfg,
+            depth=raw.get("selected_depth", 1) if depth is None else depth,
+            reserve_soc=raw.get("reserve_soc", 0.08),
+            emergency_soc=raw.get("emergency_soc", 0.22),
+            pickup_weight=weights.get("pickup_distance", 1.0),
+            delivery_weight=weights.get("delivery_distance", 0.75),
+            lateness_weight=weights.get("lateness_risk", 8.0),
+            battery_weight=weights.get("battery_shortfall", 150.0),
+            age_weight=weights.get("order_age", -0.15),
+            post_charge_weight=weights.get("post_charge_distance", 0.25),
+        )
 
     def act(self, obs):
         c = self.cfg
@@ -144,18 +199,18 @@ class RoleCRolloutPlanner:
                     battery_shortfall = max(0.0, energy_need + self.reserve_soc - soc)
 
                     score = (
-                        1.00 * pickup_dist
-                        + 0.75 * delivery_dist
-                        + 8.00 * lateness_risk
-                        + 150.0 * battery_shortfall
-                        - 0.15 * age
+                        self.pickup_weight * pickup_dist
+                        + self.delivery_weight * delivery_dist
+                        + self.lateness_weight * lateness_risk
+                        + self.battery_weight * battery_shortfall
+                        + self.age_weight * age
                     )
 
                     if self.depth >= 2:
                         # Shallow rollout proxy:
                         # after delivery, prefer actions that leave the drone closer to charging.
                         post_charge_dist = self._nearest_charger_distance(grid, dest)
-                        score += 0.25 * post_charge_dist
+                        score += self.post_charge_weight * post_charge_dist
 
                     # If low battery and this job is not safely feasible, penalize strongly.
                     if soc < c.charge_threshold and battery_shortfall > 0:

@@ -1,15 +1,23 @@
 # run_all results table
 
-Eval config = configs/eval_standard.yaml | seeds = [0, 1, 2] | primary metric = cost_per_order (lower better)
+Eval config = configs/eval_stress.yaml | seeds = [5, 6, 7] | primary metric = cost_per_order (lower better)
 
 | policy | cost/order (mean±std) | success rate |
 |---|---|---|
-| random | 18.78 ± 1.27 | 0.653 |
-| greedy_nearest | 4.57 ± 0.85 | 0.855 |
-| milp_rolling | 4.72 ± 1.38 | 0.836 |
-| DQN n=3 | 20.67 ± 6.57 | 0.495 |
-| Double DQN n=3 | 6.76 ± 1.80 | 0.749 |
-| Dueling DQN n=3 | 26.07 ± 3.49 | 0.428 |
-| Offline CQL (joint) | 8.42 ± 1.91 | 0.680 |
+| random | 42.80 ± 6.80 | 0.377 |
+| greedy_nearest | 12.02 ± 1.12 | 0.597 |
+| milp_rolling | 12.23 ± 1.10 | 0.603 |
+| DQN n=3 [config-incompatible] | nan ± nan | 0.000 |
+| Double DQN n=3 [config-incompatible] | nan ± nan | 0.000 |
+| Dueling DQN n=3 [config-incompatible] | nan ± nan | 0.000 |
+| Factored Double DQN (demo warm-start) | 11.19 ± 0.56 | 0.583 |
+| REINFORCE + GAE | 14.13 ± 2.02 | 0.546 |
+| A2C | 19.53 ± 3.55 | 0.488 |
+| Role C rollout depth=1 | 10.46 ± 3.05 | 0.625 |
+| Offline CQL (joint) [config-incompatible] | nan ± nan | 0.000 |
 
-**Joint multi-agent** (DroneDispatchMA-v0, separate env): cost_per_order = 6.49, delivered/ep = 100.7, return = 793.8.
+## Role B continuous control
+
+DDPG on DroneControl-v0: return = -126.42, success = 0.000, mean steps = 214.0.
+
+**Joint multi-agent** (DroneDispatchMA-v0, separate env): cost_per_order = 31.28, delivered/ep = 74.0, return = -1187.3.

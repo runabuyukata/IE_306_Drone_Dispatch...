@@ -68,13 +68,13 @@ def _q_diag(net, obs):
     return float(q.mean()), float(q.max())
 
 
-def train(method, data, steps, batch, lr, cql_alpha, device, log):
+def train(method, data, steps, batch, lr, cql_alpha, device, log, seed):
     net, tgt = _qnet(device), _qnet(device)
     tgt.load_state_dict(net.state_dict())
     opt = torch.optim.Adam(net.parameters(), lr=lr)
     n = data["obs"].shape[0]
     probe = data["obs"][:4096]  # fixed states for the Q-magnitude probe
-    rng = np.random.default_rng(0)
+    rng = np.random.default_rng(seed)
 
     for step in range(1, steps + 1):
         idx = torch.as_tensor(rng.integers(0, n, batch), device=device)
@@ -100,7 +100,8 @@ def train(method, data, steps, batch, lr, cql_alpha, device, log):
             tgt.load_state_dict(net.state_dict())
         if step % max(1, steps // 20) == 0:
             mq, xq = _q_diag(net, probe)
-            log.append(dict(method=method, step=step, loss=float(loss),
+            log.append(dict(seed=seed, method=method, step=step,
+                            loss=float(loss.detach()),
                             mean_q=mq, max_q=xq))
             print(f"  [{method}] step {step:6d} loss={float(loss):8.3f} "
                   f"mean_q={mq:8.2f} max_q={xq:8.2f}")
@@ -134,6 +135,9 @@ def main():
     ap.add_argument("--lr", type=float, default=None)
     ap.add_argument("--cql-alpha", type=float, default=None)
     ap.add_argument("--out", default=None)
+    ap.add_argument("--qstats", default=None)
+    ap.add_argument("--weight", default=None)
+    ap.add_argument("--seed", type=int, default=None)
     args = ap.parse_args()
 
     # config file holds the defaults; explicit CLI flags override it
@@ -151,9 +155,19 @@ def main():
     args.lr = float(pick("lr", 1e-3))
     args.cql_alpha = float(pick("cql-alpha", 1.0))
     args.out = pick("out", "logs/offline_results.json")
+    global OBS_DIM, N_ACTIONS, HIDDEN, GAMMA, EVAL_SEEDS
+    OBS_DIM = int(cfgd.get("obs-dim", 181))
+    N_ACTIONS = int(cfgd.get("n-actions", 169))
+    HIDDEN = [int(x) for x in cfgd.get("hidden", [256, 256])]
+    GAMMA = float(cfgd.get("gamma", 0.99))
+    EVAL_SEEDS = [int(s) for s in cfgd.get("eval-seeds", [0, 1, 2])]
+    training_seeds = [int(s) for s in cfgd.get("seeds", [0, 1, 2])]
+    seed = int(args.seed if args.seed is not None else training_seeds[0])
+    args.qstats = args.qstats or f"logs/offline_qstats_seed{seed}.csv"
+    args.weight = args.weight or f"weights/offline_cql_seed{seed}.pt"
 
     import random
-    torch.manual_seed(0); np.random.seed(0); random.seed(0)  # reproducibility (spec §10)
+    torch.manual_seed(seed); np.random.seed(seed); random.seed(seed)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"device={device}  data={args.data}")
     data, mean, std = load_pool(args.data, device)
@@ -168,7 +182,7 @@ def main():
     for method, steps in plans:
         print(f"== train {method} ({steps} steps) ==")
         nets[method] = train(method, data, steps, args.batch, args.lr,
-                             args.cql_alpha, device, log)
+                             args.cql_alpha, device, log, seed)
         pol = _Wrapped(nets[method], mean, std, device)
         m = evaluate(pol, cfg, seeds=EVAL_SEEDS)["mean"]
         results[method] = m
@@ -177,10 +191,12 @@ def main():
 
     Path("logs").mkdir(exist_ok=True)
     with open(args.out, "w") as f:
-        json.dump({"refs": refs, "results": results, "eval_seeds": EVAL_SEEDS}, f, indent=2)
+        json.dump({"refs": refs, "results": results, "training_seed": seed,
+                   "eval_seeds": EVAL_SEEDS}, f, indent=2)
     import csv
-    with open("logs/offline_qstats.csv", "w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=["method", "step", "loss", "mean_q", "max_q"])
+    with open(args.qstats, "w", newline="") as f:
+        w = csv.DictWriter(
+            f, fieldnames=["seed", "method", "step", "loss", "mean_q", "max_q"])
         w.writeheader(); w.writerows(log)
 
     # save the submitted offline policy (CQL) + its normalization stats, so
@@ -188,7 +204,7 @@ def main():
     Path("weights").mkdir(exist_ok=True)
     torch.save({"model_state": nets["cql"].state_dict(), "mean": mean, "std": std,
                 "obs_dim": OBS_DIM, "n_actions": N_ACTIONS, "hidden": HIDDEN},
-               "weights/offline_cql.pt")
+               args.weight)
 
     print("\n=== OFFLINE RL — cost_per_order (lower better), eval seeds", EVAL_SEEDS, "===")
     for k, v in refs.items():

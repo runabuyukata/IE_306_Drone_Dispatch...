@@ -4,6 +4,16 @@ selected_depth: 1
 ablation_depths: [0, 1, 2]
 seeds: [0, 1, 2]
 eval_config: configs/eval_standard.yaml
+reserve_soc: 0.08
+emergency_soc: 0.22
+
+score_weights:
+  pickup_distance: 1.0
+  delivery_distance: 0.75
+  lateness_risk: 8.0
+  battery_shortfall: 150.0
+  order_age: -0.15
+  post_charge_distance: 0.25
 
 planner_terms:
   - routed_pickup_distance

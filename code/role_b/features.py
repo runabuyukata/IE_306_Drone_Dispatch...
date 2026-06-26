@@ -20,10 +20,14 @@ the held-out grading config.
 """
 from __future__ import annotations
 
+from collections import deque
+
 import numpy as np
 
-from drone_dispatch_env.config import Config, NOFLY, CHARGER
-from drone_dispatch_env.world import Router
+from drone_dispatch_env.config import Config
+
+NOFLY = 1
+CHARGER = 3
 
 # drone row layout (env_dispatch._obs): [x, y, soc, alive, status_onehot(5), has_order]
 _D_X, _D_Y, _D_SOC, _D_ALIVE = 0, 1, 2, 3
@@ -50,7 +54,6 @@ class RoutedCache:
     def __init__(self, neighborhood: int = 4):
         self.neighborhood = neighborhood
         self._grid_key = None
-        self._router: Router | None = None
         self._fields: dict[tuple[int, int], np.ndarray] = {}
         self._charger_field: np.ndarray | None = None
 
@@ -58,13 +61,12 @@ class RoutedCache:
         key = grid.tobytes()
         if key != self._grid_key:
             self._grid_key = key
-            self._router = Router(grid, self.neighborhood)
             self._fields = {}
             chargers = np.argwhere(grid == CHARGER)
             if len(chargers) == 0:
                 self._charger_field = np.full(grid.shape, np.inf)
             else:
-                stacked = np.stack([self._router.dist_field((int(cx), int(cy)))
+                stacked = np.stack([self._dist_field(grid, (int(cx), int(cy)))
                                     for cx, cy in chargers], axis=0)
                 self._charger_field = stacked.min(axis=0)
 
@@ -72,13 +74,35 @@ class RoutedCache:
         self._ensure(grid)
         f = self._fields.get(src)
         if f is None:
-            f = self._router.dist_field(src)
+            f = self._dist_field(grid, src)
             self._fields[src] = f
         return f
 
     def charger_field(self, grid: np.ndarray) -> np.ndarray:
         self._ensure(grid)
         return self._charger_field
+
+    def _dist_field(self, grid: np.ndarray, src: tuple[int, int]) -> np.ndarray:
+        h, w = grid.shape
+        dist = np.full((h, w), np.inf, dtype=np.float32)
+        sx, sy = src
+        if not (0 <= sx < h and 0 <= sy < w) or grid[sx, sy] == NOFLY:
+            return dist
+        dist[sx, sy] = 0.0
+        q = deque([(sx, sy)])
+        moves = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        if self.neighborhood == 8:
+            moves += [(-1, -1), (-1, 1), (1, -1), (1, 1)]
+        while q:
+            x, y = q.popleft()
+            nd = dist[x, y] + 1.0
+            for mx, my in moves:
+                nx, ny = x + mx, y + my
+                if (0 <= nx < h and 0 <= ny < w
+                        and grid[nx, ny] != NOFLY and nd < dist[nx, ny]):
+                    dist[nx, ny] = nd
+                    q.append((nx, ny))
+        return dist
 
 
 def extract_features(obs: dict, cfg: Config, cache: RoutedCache) -> dict:

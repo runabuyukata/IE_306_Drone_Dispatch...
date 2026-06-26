@@ -33,14 +33,7 @@ from dqn_agent import QNetwork
 from drone_dispatch_env.config import Config, IDLE, TO_DROPOFF
 from drone_dispatch_env.env_ma import DroneDispatchMAEnv
 
-OBS_DIM = 59
-N_ACTIONS = 4
-HIDDEN = [128, 128]
-GAMMA = 0.99
-EVAL_SEEDS = [0, 1, 2]
-
-
-def eval_ma(net, cfg, device, policy="greedy", seeds=EVAL_SEEDS, rng=None):
+def eval_ma(net, cfg, device, policy="greedy", seeds=(0, 1, 2), rng=None):
     """Returns (mean_return, mean_cost_per_order, mean_delivered)."""
     env = DroneDispatchMAEnv(cfg)
     rng = rng or np.random.default_rng(0)
@@ -54,18 +47,26 @@ def eval_ma(net, cfg, device, policy="greedy", seeds=EVAL_SEEDS, rng=None):
             actions = {}
             for i, a in enumerate(env.agents):
                 if policy == "random":
-                    actions[a] = int(rng.integers(N_ACTIONS))
+                    actions[a] = int(rng.integers(4))
                 else:
                     x = torch.as_tensor(obs[a], device=device)[None]
                     with torch.no_grad():
                         actions[a] = int(net(x).argmax(1).item())
+            delivery_deadlines = {
+                i: next((o.deadline for o in env.pending
+                         if o.oid == env.drones[i].order_id), None)
+                for i in range(cfg.n_drones)
+                if env.drones[i].status == TO_DROPOFF
+            }
+            delivery_t = env.t
             obs, rew, terms, truncs, _ = env.step(actions)
             R += sum(rew.values())
             for i, a in enumerate(env.agents):
                 cs = env.drones[i].status
                 if prev[i] == TO_DROPOFF and cs == IDLE and not env.drones[i].lost:
                     D += 1
-                    if rew[a] >= 14.0:  # 10 delivered + 5 ontime - tiny energy
+                    deadline = delivery_deadlines.get(i)
+                    if deadline is not None and delivery_t <= deadline:
                         OT += 1
                 prev[i] = cs
             done = all(terms.values())
@@ -86,9 +87,11 @@ def main():
     ap.add_argument("--warmup", type=int, default=None)
     ap.add_argument("--eps-frac", type=float, default=None)
     ap.add_argument("--target-every", type=int, default=None)
+    ap.add_argument("--train-every", type=int, default=None)
     ap.add_argument("--eval-every", type=int, default=None,
                     help="periodic eval interval (0 = steps//6)")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--seed", type=int, default=None)
     args = ap.parse_args()
 
     import yaml
@@ -105,19 +108,27 @@ def main():
     args.warmup = int(pick("warmup", 2000))
     args.eps_frac = float(pick("eps-frac", 0.5))
     args.target_every = int(pick("target-every", 1000))
+    args.train_every = int(pick("train-every", 4))
     args.eval_every = int(pick("eval-every", 0))
     args.out = pick("out", "logs/ma_results.json")
+    seed = int(args.seed if args.seed is not None else cfgd.get("seed", 0))
+    hidden = [int(x) for x in cfgd.get("hidden", [128, 128])]
+    gamma = float(cfgd.get("gamma", 0.99))
+    obs_dim = int(cfgd.get("obs-dim", 59))
+    n_actions = int(cfgd.get("n-actions", 4))
+    eval_seeds = [int(s) for s in cfgd.get("eval-seeds", [0, 1, 2])]
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     cfg = Config()
-    torch.manual_seed(0); np.random.seed(0); random.seed(0)
+    torch.set_num_threads(1)
+    torch.manual_seed(seed); np.random.seed(seed); random.seed(seed)
 
-    net = QNetwork(OBS_DIM, N_ACTIONS, HIDDEN).to(device)
-    tgt = QNetwork(OBS_DIM, N_ACTIONS, HIDDEN).to(device)
+    net = QNetwork(obs_dim, n_actions, hidden).to(device)
+    tgt = QNetwork(obs_dim, n_actions, hidden).to(device)
     tgt.load_state_dict(net.state_dict())
     opt = torch.optim.Adam(net.parameters(), lr=args.lr)
     buf = deque(maxlen=args.buffer)
-    rng = np.random.default_rng(0)
+    rng = np.random.default_rng(seed)
 
     env = DroneDispatchMAEnv(cfg)
     obs, _ = env.reset(seed=0)
@@ -130,7 +141,7 @@ def main():
         actions = {}
         for a in env.agents:
             if rng.random() < eps:
-                actions[a] = int(rng.integers(N_ACTIONS))
+                actions[a] = int(rng.integers(n_actions))
             else:
                 with torch.no_grad():
                     x = torch.as_tensor(obs[a], device=device)[None]
@@ -142,7 +153,8 @@ def main():
         if all(terms.values()):
             obs, _ = env.reset(seed=int(rng.integers(1_000_000)))
 
-        if len(buf) >= max(args.warmup, args.batch):
+        if (len(buf) >= max(args.warmup, args.batch)
+                and step % args.train_every == 0):
             batch = random.sample(buf, args.batch)
             o, a, r, no, d = zip(*batch)
             o = torch.as_tensor(np.stack(o), device=device)
@@ -152,7 +164,7 @@ def main():
             d = torch.as_tensor(np.asarray(d, np.float32), device=device)
             q = net(o).gather(1, a[:, None]).squeeze(1)
             with torch.no_grad():
-                target = r + GAMMA * (1 - d) * tgt(no).max(1).values
+                target = r + gamma * (1 - d) * tgt(no).max(1).values
             loss = F.smooth_l1_loss(q, target)
             opt.zero_grad(); loss.backward(); opt.step()
             if step % args.target_every == 0:
@@ -160,31 +172,33 @@ def main():
 
         eval_every = args.eval_every or max(1, args.steps // 6)
         if step % eval_every == 0:
-            ret, cost, deliv = eval_ma(net, cfg, device)
+            ret, cost, deliv = eval_ma(net, cfg, device, seeds=eval_seeds)
             log.append(dict(step=step, eps=round(eps, 3), ret=ret, cost=cost, deliv=deliv))
             print(f"  step {step:6d} eps={eps:.2f} return={ret:8.1f} "
                   f"cost={cost:7.2f} delivered={deliv:.1f}")
 
     # baselines + final head-to-head
-    rnd = eval_ma(net, cfg, device, policy="random")
-    idqn = eval_ma(net, cfg, device, policy="greedy")
+    rnd = eval_ma(net, cfg, device, policy="random", seeds=eval_seeds)
+    idqn = eval_ma(net, cfg, device, policy="greedy", seeds=eval_seeds)
     results = {
         "idqn_ma": {"return": idqn[0], "cost_per_order": idqn[1], "delivered": idqn[2]},
         "random_ma": {"return": rnd[0], "cost_per_order": rnd[1], "delivered": rnd[2]},
         "ref_centralized_double_dqn": {"cost_per_order": 6.76,
             "note": "different env/action abstraction; paradigm reference, not identical metric"},
-        "eval_seeds": EVAL_SEEDS,
+        "training_seed": seed,
+        "eval_seeds": eval_seeds,
     }
     Path("logs").mkdir(exist_ok=True)
     json.dump(results, open(args.out, "w"), indent=2)
-    with open("logs/ma_idqn.csv", "w", newline="") as f:
+    with open(f"logs/ma_idqn_seed{seed}.csv", "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=["step", "eps", "ret", "cost", "deliv"])
         w.writeheader(); w.writerows(log)
     Path("weights").mkdir(exist_ok=True)
-    torch.save({"model_state": net.state_dict(), "obs_dim": OBS_DIM,
-                "n_actions": N_ACTIONS, "hidden": HIDDEN}, "weights/ma_idqn.pt")
+    torch.save({"model_state": net.state_dict(), "obs_dim": obs_dim,
+                "n_actions": n_actions, "hidden": hidden,
+                "training_seed": seed}, f"weights/ma_idqn_seed{seed}.pt")
 
-    print("\n=== MULTI-AGENT IDQN (param sharing) — eval seeds", EVAL_SEEDS, "===")
+    print("\n=== MULTI-AGENT IDQN (param sharing) — eval seeds", eval_seeds, "===")
     print(f"  {'random (MA)':22s} return={rnd[0]:8.1f} cost={rnd[1]:7.2f} delivered={rnd[2]:.1f}")
     print(f"  {'IDQN  (MA)':22s} return={idqn[0]:8.1f} cost={idqn[1]:7.2f} delivered={idqn[2]:.1f}")
     print(f"  {'ref centralized DQN':22s} cost=6.76 (own env, paradigm reference)")

@@ -38,7 +38,8 @@ def main():
     cfg = Config.from_yaml(args.config)
     seeds = [int(s) for s in args.seeds.split(",") if s.strip() != ""]
 
-    policy = RoleCRolloutPlanner(cfg, depth=args.depth)
+    policy = RoleCRolloutPlanner.from_yaml(
+        cfg, "configs/role_c_rollout.yaml", depth=args.depth)
     results = evaluate(policy, cfg, seeds)
 
     os.makedirs(args.log_dir, exist_ok=True)

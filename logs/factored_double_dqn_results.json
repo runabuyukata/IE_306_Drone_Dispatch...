@@ -1,0 +1,30 @@
+{
+  "per_training_seed": {
+    "0": {
+      "best_step": 5000,
+      "cost_per_order": 1.7218704545454713,
+      "success_rate": 0.9135536920743554,
+      "episode_return": 1665.071333333334
+    },
+    "1": {
+      "best_step": 5000,
+      "cost_per_order": 2.653670734985623,
+      "success_rate": 0.8629933097984601,
+      "episode_return": 1482.6543333333336
+    },
+    "2": {
+      "best_step": 5000,
+      "cost_per_order": 2.4985983494148045,
+      "success_rate": 0.8719669219669219,
+      "episode_return": 1499.811333333335
+    }
+  },
+  "cost_per_order_mean": 2.2913798463152997,
+  "cost_per_order_std": 0.40764982658910087,
+  "selected_seed": 0,
+  "eval_seeds": [
+    0,
+    1,
+    2
+  ]
+}

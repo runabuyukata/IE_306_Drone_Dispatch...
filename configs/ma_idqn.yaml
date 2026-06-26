@@ -1,12 +1,19 @@
 # Multi-agent IDQN (Bölüm 21) — parameter-sharing on DroneDispatchMA-v0.
 # These are the exact values used for the submitted weights/ma_idqn.pt.
-steps: 60000
+steps: 30000
 batch: 128
 lr: 0.001
 buffer: 100000
 warmup: 2000
 eps-frac: 0.5        # epsilon 1.0 -> 0.05, adimlarin %50'sinde
 target-every: 1000
-eval-every: 12000
+train-every: 4
+eval-every: 6000
 out: logs/ma_results.json
-# 8 ajan tek paylasilan Q-agi (59-dim obs, 4 aksiyon), ortak replay; eval seeds 0,1,2
+seed: 0
+seeds: [0, 1, 2]
+hidden: [128, 128]
+gamma: 0.99
+obs-dim: 59
+n-actions: 4
+eval-seeds: [0, 1, 2]

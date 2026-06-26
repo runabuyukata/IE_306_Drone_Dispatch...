@@ -6,6 +6,12 @@ bc-steps: 15000     # behavioural cloning adimi
 batch: 256
 lr: 0.001
 cql-alpha: 1.0      # CQL konservatiflik katsayisi
+seeds: [0, 1, 2]
+eval-seeds: [0, 1, 2]
+hidden: [256, 256]
+gamma: 0.99
+obs-dim: 181
+n-actions: 169
 out: logs/offline_results.json
 # not: obs 181-dim _flatten_obs, havuzdan standardize; done = terminals (d4rl
 # konvansiyonu: truncation/timeout terminal degil, backup'ta bootstrap edilir);

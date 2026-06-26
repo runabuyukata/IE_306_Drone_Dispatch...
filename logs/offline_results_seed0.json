@@ -1,0 +1,54 @@
+{
+  "refs": {
+    "random": 18.78,
+    "greedy_nearest": 4.57,
+    "online_dqn_1M": 6.76
+  },
+  "results": {
+    "bc": {
+      "cost_per_order": 22.468257116067246,
+      "success_rate": 0.49527068526805307,
+      "ontime_rate": 0.9190052017056236,
+      "mean_delivery_time": 36.328086977876005,
+      "energy_per_order": 0.2974994083897044,
+      "depletion_events": 6.0,
+      "idle_pct": 0.06936085172330149,
+      "charger_utilization": 0.09564993281873828,
+      "n_delivered": 58.333333333333336,
+      "n_dropped": 59.333333333333336,
+      "episode_return": -362.6820000000001
+    },
+    "naive": {
+      "cost_per_order": 17.440443733003118,
+      "success_rate": 0.4725447909754479,
+      "ontime_rate": 0.8924509518259519,
+      "mean_delivery_time": 37.304105963480964,
+      "energy_per_order": 0.31974103292541606,
+      "depletion_events": 0.3333333333333333,
+      "idle_pct": 0.1376426766551659,
+      "charger_utilization": 0.23202537595828196,
+      "n_delivered": 65.0,
+      "n_dropped": 72.66666666666667,
+      "episode_return": -196.9476666666668
+    },
+    "cql": {
+      "cost_per_order": 8.41903393782726,
+      "success_rate": 0.6800427649542738,
+      "ontime_rate": 0.7934886994501014,
+      "mean_delivery_time": 43.18362982476913,
+      "energy_per_order": 0.3036745139053507,
+      "depletion_events": 1.3333333333333333,
+      "idle_pct": 0.037921381744889564,
+      "charger_utilization": 0.15439455887359121,
+      "n_delivered": 93.66666666666667,
+      "n_dropped": 44.0,
+      "episode_return": 535.2483333333333
+    }
+  },
+  "training_seed": 0,
+  "eval_seeds": [
+    0,
+    1,
+    2
+  ]
+}

@@ -5,10 +5,14 @@ modify the simulator; you write policies that run inside it. The full API you ma
 rely on is in the **Simulator Specification, Section 12** (handed out separately
 on Teams) — code against that, not against the internals.
 
+Role ownership is listed in `ROLES.md`; the shared integration-account note is
+in `CONTRIBUTIONS.md`.
+
 ## Install
 ```bash
 cd drone_dispatch_env          # this folder (has pyproject.toml)
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
 pip install -e .
 ```
 This installs the three Gymnasium env ids: `DroneDispatch-v0` (centralized
@@ -17,7 +21,7 @@ dispatcher, discrete), `DroneControl-v0` (continuous control), and
 
 ## Sanity check (do this Day 1)
 ```bash
-python -m pytest tests -q                                   # 14 tests, all pass
+python -m pytest tests -q                                   # 17 tests, all pass
 bash reproduce.sh configs/eval_standard.yaml "0,1,2" greedy_nearest
 ```
 The second command prints the baseline scores on the standard eval config. Your
@@ -38,19 +42,25 @@ obs, info = env.reset(seed=0)
 print(evaluate(GreedyNearest(Config()), Config(), seeds=[0,1,2])["mean"])
 ```
 
-## Offline dataset (your offline-RL component, Ch. 20)
-For IE 306 you **build your own** mixed-quality dataset by pooling logged
-trajectories from your three trained policies — no dataset ships with this zip.
-Save it as a `.npz` with the same arrays the loaders expect (`observations`,
-`actions`, `rewards`, `next_observations`, `terminals`, `timeouts`,
-`episode_returns`), then reuse the shipped utilities:
+## Offline dataset (Ch. 20)
+The submitted mixed-quality dataset is `offline_pool.npz`. Its size, checksum,
+and validation command are documented in `DATASET.md`. It uses the expected
+arrays (`observations`, `actions`, `rewards`, `next_observations`, `terminals`,
+`timeouts`, `episode_returns`):
 ```python
 from drone_dispatch_env import load_offline_dataset, make_preference_pairs
-d = load_offline_dataset("your_dataset.npz")
-pairs = make_preference_pairs("your_dataset.npz", n_pairs=1000)
+d = load_offline_dataset("offline_pool.npz")
+pairs = make_preference_pairs("offline_pool.npz", n_pairs=1000)
 ```
-`drone_dispatch_env.offline.generate_offline_dataset(...)` shows the exact
-format to match. Episode boundaries are `terminals | timeouts`.
+Episode boundaries are `terminals | timeouts`.
+
+## Reproduce the complete team table
+```bash
+python run_all.py --config configs/eval_standard.yaml --seeds 0,1,2
+```
+This loads the saved Role A, Role B, Role C, offline-CQL, and multi-agent
+policies. DDPG and multi-agent results are shown separately because they use
+different environments.
 
 ## Visualizer
 `drone_dispatch_env.visualize` provides `render_frame`, `Recorder`, `Replayer`
