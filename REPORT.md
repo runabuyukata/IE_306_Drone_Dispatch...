@@ -61,9 +61,9 @@ Dueling DQN (green) is the weakest — highest cost, lowest return, and the wide
 ±std band (spiking past 40). This ordering is exactly why the flat line was
 carried forward as Double DQN rather than the dueling variant.
 
-![DQN vs Double vs Dueling — cost (600k, 3-seed mean±std)](figures/curves_methods_600k_cost.png)
+![DQN vs Double vs Dueling — cost (600k, 3-seed mean±std)](figures/dqn_family_600k_cost.png)
 
-![DQN vs Double vs Dueling — return (600k, 3-seed mean±std)](figures/curves_methods_600k_return.png)
+![DQN vs Double vs Dueling — return (600k, 3-seed mean±std)](figures/dqn_family_600k_return.png)
 
 Crucially, *none* of the three flat variants approaches the greedy bar of 4.57:
 they all plateau around 16–22 cost. Extending the best one (Double DQN) to 3M
@@ -73,7 +73,7 @@ then **diverges back to ~30** by 3M. This is the value-based bootstrapping
 instability that motivated replacing the flat representation with the factored
 Double DQN.
 
-![Double DQN extended to 3M — good band then divergence (3-seed mean±std)](figures/curves_double_3m_cost.png)
+![Double DQN extended to 3M — good band then divergence (3-seed mean±std)](figures/double_dqn_3m_cost.png)
 
 The TD learning is not cosmetic on top of the warm start. With 0 TD steps the
 network is a pure imitation of the Role-C depth-1 planner; it already beats
