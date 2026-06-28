@@ -13,7 +13,7 @@ Eval config = configs/eval_standard.yaml | seeds = [0, 1, 2] | primary metric = 
 | Factored Double DQN (demo warm-start) | 1.72 ± 0.05 | 0.914 |
 | REINFORCE + GAE | 2.57 ± 0.86 | 0.903 |
 | A2C | 1.09 ± 0.43 | 0.976 |
-| Role C rollout depth=1 | 2.92 ± 0.40 | 0.881 |
+| Role C rollout depth=2 | 3.33 ± 0.71 | 0.869 |
 | Offline CQL (joint) | 5.72 ± 1.38 | 0.754 |
 
 ## Role B continuous control
