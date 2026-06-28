@@ -1,6 +1,6 @@
 method: role_c_rollout_planner
 role: C
-selected_depth: 1
+selected_depth: 2
 ablation_depths: [0, 1, 2]
 seeds: [0, 1, 2]
 eval_config: configs/eval_standard.yaml

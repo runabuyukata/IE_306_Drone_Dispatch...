@@ -138,8 +138,8 @@ def main():
             continue
         rows.append((name, *stats(evaluate(load_dispatch_agent(wp, cfg), cfg, seeds))))
     role_c = RoleCRolloutPlanner.from_yaml(
-        cfg, "configs/role_c_rollout.yaml", depth=1)
-    rows.append(("Role C rollout depth=1",
+        cfg, "configs/role_c_rollout.yaml")
+    rows.append((f"Role C rollout depth={role_c.depth}",
                  *stats(evaluate(role_c, cfg, seeds))))
     if Path(CQL_WEIGHTS).exists():  # joint offline method, same centralized env
         try:
